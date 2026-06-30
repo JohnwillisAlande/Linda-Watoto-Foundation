@@ -1,6 +1,8 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 
-// Defining a type for our team members to keep the code clean and type-safe
 interface TeamMember {
   id: string;
   name: string;
@@ -9,89 +11,188 @@ interface TeamMember {
   imagePath: string;
 }
 
-// You can easily update this array as the foundation's leadership grows
 const teamMembers: TeamMember[] = [
   {
-    id: "member-1",
-    name: "Jane Doe", // Replace with actual names
+    id: "m1",
+    name: "Jane Doe",
     role: "Founder & Executive Director",
-    bio: "Dedicated to creating sustainable support systems for children across the region. Jane oversees the overarching vision and PBO compliance.",
-    imagePath: "/assets/images/management/profile-placeholder.jpg", // Update with actual image paths
-  },
-  {
-    id: "member-2",
-    name: "John Smith",
-    role: "Operations Manager",
-    bio: "Coordinates logistics for all community hangouts, home visits, and ensures donations reach the right hands at the right time.",
+    bio: "Dedicated to creating sustainable support systems for children across the region.",
     imagePath: "/assets/images/management/profile-placeholder.jpg",
   },
   {
-    id: "member-3",
+    id: "m2",
+    name: "John Smith",
+    role: "Operations Manager",
+    bio: "Coordinates logistics for all community hangouts and home visits.",
+    imagePath: "/assets/images/management/profile-placeholder.jpg",
+  },
+  {
+    id: "m3",
     name: "Sarah Johnson",
     role: "Volunteer Coordinator",
-    bio: "The bridge between our foundation and the community. Sarah manages volunteer onboarding, membership engagement, and event teams.",
+    bio: "Manages volunteer onboarding, membership engagement, and event teams.",
+    imagePath: "/assets/images/management/profile-placeholder.jpg",
+  },
+  {
+    id: "m4",
+    name: "Michael Kamau",
+    role: "Finance Director",
+    bio: "Ensures all donations and foundation funds are managed with 100% transparency.",
+    imagePath: "/assets/images/management/profile-placeholder.jpg",
+  },
+  {
+    id: "m5",
+    name: "Esther Wanjiru",
+    role: "Mentorship Lead",
+    bio: "Develops the educational and emotional support frameworks for our visits.",
+    imagePath: "/assets/images/management/profile-placeholder.jpg",
+  },
+  {
+    id: "m6",
+    name: "David Ochieng",
+    role: "Partnerships Director",
+    bio: "Bridges the gap between corporate sponsors and grassroots foundation needs.",
+    imagePath: "/assets/images/management/profile-placeholder.jpg",
+  },
+  {
+    id: "m7",
+    name: "Grace Mutuku",
+    role: "Media & Communications",
+    bio: "Captures the beautiful moments of our visits and manages our public presence.",
     imagePath: "/assets/images/management/profile-placeholder.jpg",
   },
 ];
 
 export default function ManagementPage() {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+
+  const nextSlide = useCallback(() => {
+    setActiveIndex((prev) => (prev === teamMembers.length - 1 ? 0 : prev + 1));
+  }, []);
+
+  const prevSlide = useCallback(() => {
+    setActiveIndex((prev) => (prev === 0 ? teamMembers.length - 1 : prev - 1));
+  }, []);
+
+  useEffect(() => {
+    if (isPaused) return;
+    const timer = setInterval(nextSlide, 5000);
+    return () => clearInterval(timer);
+  }, [isPaused, nextSlide]);
+
   return (
-    <main className="container mx-auto px-4 py-16 max-w-6xl">
+    <main className="min-h-screen bg-slate-50 text-slate-900 overflow-hidden py-20 relative">
       
-      {/* Header Section */}
-      <div className="text-center mb-16">
-        <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-4">Our Leadership Team</h1>
-        <p className="text-xl text-slate-600 max-w-2xl mx-auto">
-          Meet the dedicated individuals working behind the scenes to ensure the Linda Watoto Foundation fulfills its promise to the community.
-        </p>
-      </div>
+      {/* Decorative Background Glow (Adjusted for light theme) */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-400/10 blur-[120px] rounded-full pointer-events-none" />
 
-      {/* Team Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {teamMembers.map((member) => (
-          <div key={member.id} className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-            
-            {/* Image Container */}
-            <div className="relative w-full aspect-square bg-slate-100">
-              {/* Note: Until you add the actual images to your public/assets/images/management/ folder, 
-                this might show a broken image icon. You can temporarily comment out the <Image> tag 
-                if you just want to see the layout.
-              */}
-              <Image
-                src={member.imagePath}
-                alt={`${member.name} - ${member.role}`}
-                fill
-                className="object-cover grayscale hover:grayscale-0 transition-all duration-500"
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+      <div className="container mx-auto px-4 relative z-10">
+        
+        {/* Header Section */}
+        <div className="text-center mb-16">
+          <h1 className="text-4xl md:text-5xl font-extrabold mb-4 text-slate-900">
+            Our Leadership Team
+          </h1>
+          <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+            Meet the dedicated individuals working behind the scenes to ensure the Linda Watoto Foundation fulfills its promise.
+          </p>
+        </div>
+
+        {/* Carousel Container */}
+        <div 
+          className="relative h-[500px] md:h-[600px] w-full max-w-6xl mx-auto flex items-center justify-center perspective-1000"
+          onMouseEnter={() => setIsPaused(true)}
+          onMouseLeave={() => setIsPaused(false)}
+        >
+          {teamMembers.map((member, index) => {
+            let offset = index - activeIndex;
+            if (offset > 3) offset -= 7;
+            if (offset < -3) offset += 7;
+
+            const isActive = offset === 0;
+            const isFlank1 = Math.abs(offset) === 1;
+            const isFlank2 = Math.abs(offset) === 2;
+
+            let translateX = offset * 110; 
+            let scale = 1;
+            let zIndex = 30;
+            let opacity = 1;
+            let blur = "blur-none";
+
+            if (!isActive) {
+              scale = isFlank1 ? 0.8 : isFlank2 ? 0.6 : 0.4;
+              zIndex = 30 - Math.abs(offset) * 10;
+              opacity = isFlank1 ? 0.8 : isFlank2 ? 0.4 : 0;
+              blur = isFlank1 ? "blur-[2px]" : "blur-[4px]";
+              translateX = offset > 0 ? (offset * 80) + 20 : (offset * 80) - 20; 
+            }
+
+            return (
+              <div
+                key={member.id}
+                className={`absolute w-[280px] md:w-[350px] h-[400px] md:h-[480px] rounded-2xl overflow-hidden cursor-pointer transition-all duration-700 ease-[cubic-bezier(0.25,0.1,0.25,1.0)] bg-white shadow-2xl border border-slate-200`}
+                style={{
+                  transform: `translateX(${translateX}%) scale(${scale})`,
+                  zIndex: zIndex,
+                  opacity: opacity,
+                }}
+                onClick={() => setActiveIndex(index)}
+              >
+                {/* Image Background */}
+                <Image
+                  src={member.imagePath}
+                  alt={member.name}
+                  fill
+                  className={`object-cover transition-all duration-700 ${!isActive ? 'grayscale opacity-70' : 'grayscale-0 opacity-100'}`}
+                />
+                
+                {/* Dark Gradient Overlay for text readability ON the image */}
+                <div className={`absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/60 to-transparent transition-opacity duration-700 ${isActive ? 'opacity-100' : 'opacity-30'}`} />
+
+                {/* Card Content (Only visible on active card) */}
+                <div className={`absolute bottom-0 left-0 w-full p-6 text-center transition-all duration-500 delay-100 ${isActive ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
+                  <h2 className="text-2xl font-bold text-white mb-1">{member.name}</h2>
+                  <p className="text-sm font-bold text-blue-300 mb-3 uppercase tracking-wider">
+                    {member.role}
+                  </p>
+                  <p className="text-slate-200 text-sm leading-relaxed line-clamp-3">
+                    {member.bio}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Navigation Controls (Updated for light theme) */}
+        <div className="flex justify-center items-center gap-8 mt-12">
+          <button 
+            onClick={prevSlide}
+            className="w-12 h-12 rounded-full border border-slate-200 bg-white hover:bg-blue-600 hover:border-blue-600 flex items-center justify-center text-slate-600 hover:text-white transition-all shadow-sm"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
+          </button>
+
+          {/* Progress Indicators */}
+          <div className="flex gap-2">
+            {teamMembers.map((_, idx) => (
+              <div 
+                key={idx} 
+                className={`h-2 rounded-full transition-all duration-500 ${activeIndex === idx ? 'w-8 bg-blue-600' : 'w-2 bg-slate-300'}`}
               />
-            </div>
-
-            {/* Content Container */}
-            <div className="p-6 text-center">
-              <h2 className="text-2xl font-bold text-slate-900 mb-1">{member.name}</h2>
-              <p className="text-sm font-semibold text-blue-600 mb-4 uppercase tracking-wider">
-                {member.role}
-              </p>
-              <p className="text-slate-600 text-sm leading-relaxed">
-                {member.bio}
-              </p>
-            </div>
-
+            ))}
           </div>
-        ))}
-      </div>
 
-      {/* Call to Action for broader membership */}
-      <div className="mt-20 bg-blue-50 rounded-2xl p-8 text-center border border-blue-100">
-        <h3 className="text-2xl font-bold text-slate-900 mb-3">Want to join the team?</h3>
-        <p className="text-slate-600 mb-6 max-w-xl mx-auto">
-          We are always looking for passionate individuals to join our general membership and volunteer network.
-        </p>
-        <a href="/join-us" className="inline-block px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors">
-          Become a Member
-        </a>
-      </div>
+          <button 
+            onClick={nextSlide}
+            className="w-12 h-12 rounded-full border border-slate-200 bg-white hover:bg-blue-600 hover:border-blue-600 flex items-center justify-center text-slate-600 hover:text-white transition-all shadow-sm"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
+          </button>
+        </div>
 
+      </div>
     </main>
   );
 }
