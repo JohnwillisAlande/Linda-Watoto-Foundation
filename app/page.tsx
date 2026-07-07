@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ImpactMetrics from "@/components/ImpactMetrics";
 
 export default function Home() {
   return (
@@ -29,6 +30,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* NEW: Impact Metrics Section injected here */}
+      <ImpactMetrics />
 
       {/* 2. Core Activities Section */}
       <section className="py-20 bg-white">
