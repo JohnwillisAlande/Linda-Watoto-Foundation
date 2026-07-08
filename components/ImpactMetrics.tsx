@@ -54,8 +54,8 @@ export default function ImpactMetrics() {
   const metrics = [
     { id: 1, label: "Children Reached", value: 1500, suffix: "+", icon: "🌟" },
     { id: 2, label: "Homes Visited", value: 12, suffix: "", icon: "🏠" },
-    { id: 3, label: "Active Volunteers", value: 85, suffix: "+", icon: "🤝" },
-    { id: 4, label: "Community Events", value: 30, suffix: "+", icon: "⚽" },
+    { id: 3, label: "Active Volunteers", value: 150, suffix: "+", icon: "🤝" },
+    { id: 4, label: "Community Events", value: 15, suffix: "+", icon: "⚽" },
   ];
 
   return (
