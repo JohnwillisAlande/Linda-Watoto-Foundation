@@ -32,8 +32,7 @@ export default function RootLayout({
               <Link href="/history" className="hover:text-blue-600 transition-colors">History</Link>
               <Link href="/management" className="hover:text-blue-600 transition-colors">Management</Link>
               <Link href="/achievements" className="hover:text-blue-600 transition-colors">Achievements</Link>
-              <Link href="/testimonials" className="hover:text-blue-600 transition-colors">Testimonials</Link>
-              <Link href="/faq" className="hover:text-blue-600 transition-colors">FAQ</Link>
+              <Link href="/events" className="hover:text-blue-600 transition-colors">Events</Link>
             </nav>
 
             {/* Call to Action Buttons */}
