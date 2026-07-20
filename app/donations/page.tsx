@@ -1,12 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 export default function DonationsPage() {
   const [activeTab, setActiveTab] = useState<"cash" | "material">("cash");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // Form State
+  const [formData, setFormData] = useState({
+    fullName: "",
+    email: "", // Added to match the database requirement
+    phone: "",
+    category: "",
+    description: "",
+  });
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   const handleCopyTill = () => {
     navigator.clipboard.writeText("8599132");
@@ -14,16 +26,67 @@ export default function DonationsPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    setFormData({ ...formData, [e.target.id]: e.target.value });
+  };
+
   const handleMaterialSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setError(null);
     
-    // Placeholder for your Next.js Server Action or API Route for material donations
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      let imageUrl = null;
+
+      // 1. Upload the image if the user selected one
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('donations')
+          .upload(fileName, imageFile);
+
+        if (uploadError) throw uploadError;
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('donations')
+          .getPublicUrl(fileName);
+          
+        imageUrl = publicUrl;
+      }
+
+      // 2. Save everything to the database
+      const { error: dbError } = await supabase.from("donations").insert([
+        {
+          full_name: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+          donation_type: formData.category,
+          description: formData.description,
+          image_url: imageUrl,
+        },
+      ]);
+
+      if (dbError) throw dbError;
+
+      // 3. Success! Show message and reset form
       setSubmitMessage("Thank you! Your material donation offer has been received. Our team will contact you shortly to arrange the handover.");
-      (e.target as HTMLFormElement).reset();
-    }, 1500);
+      setFormData({ fullName: "", email: "", phone: "", category: "", description: "" });
+      setImageFile(null);
+      
+      // Reset the actual file input element visually
+      const fileInput = document.getElementById('imageUpload') as HTMLInputElement;
+      if (fileInput) fileInput.value = "";
+
+    } catch (err: unknown) {
+      // Safely handle the error without using 'any'
+      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
+      setError("Something went wrong: " + errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -111,49 +174,78 @@ export default function DonationsPage() {
                 </div>
               ) : (
                 <form onSubmit={handleMaterialSubmit} className="space-y-6 max-w-2xl mx-auto">
+                  
+                  {error && (
+                    <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm font-medium border border-red-100">
+                      {error}
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label htmlFor="donorName" className="block text-sm font-semibold text-slate-700 mb-2">
+                      <label htmlFor="fullName" className="block text-sm font-semibold text-slate-700 mb-2">
                         Full Name <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
-                        id="donorName"
+                        id="fullName"
+                        value={formData.fullName}
+                        onChange={handleChange}
                         required
                         className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition-colors"
                         placeholder="John Doe"
                       />
                     </div>
                     <div>
-                      <label htmlFor="donorPhone" className="block text-sm font-semibold text-slate-700 mb-2">
+                      <label htmlFor="email" className="block text-sm font-semibold text-slate-700 mb-2">
+                        Email Address <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        id="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition-colors"
+                        placeholder="john@example.com"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label htmlFor="phone" className="block text-sm font-semibold text-slate-700 mb-2">
                         Phone Number <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="tel"
-                        id="donorPhone"
+                        id="phone"
+                        value={formData.phone}
+                        onChange={handleChange}
                         required
                         className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition-colors"
                         placeholder="07XX XXX XXX"
                       />
                     </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="category" className="block text-sm font-semibold text-slate-700 mb-2">
-                      Donation Category <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      id="category"
-                      required
-                      className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition-colors bg-white"
-                    >
-                      <option value="">Select a category</option>
-                      <option value="clothing">Clothing & Shoes</option>
-                      <option value="food">Dry Food & Groceries</option>
-                      <option value="education">Books & Stationery</option>
-                      <option value="sanitary">Sanitary Towels & Hygiene</option>
-                      <option value="other">Other</option>
-                    </select>
+                    <div>
+                      <label htmlFor="category" className="block text-sm font-semibold text-slate-700 mb-2">
+                        Donation Category <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        id="category"
+                        value={formData.category}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition-colors bg-white"
+                      >
+                        <option value="">Select a category</option>
+                        <option value="clothing">Clothing & Shoes</option>
+                        <option value="food">Dry Food & Groceries</option>
+                        <option value="education">Books & Stationery</option>
+                        <option value="sanitary">Sanitary Towels & Hygiene</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
                   </div>
 
                   <div>
@@ -164,6 +256,7 @@ export default function DonationsPage() {
                       type="file"
                       id="imageUpload"
                       accept="image/*"
+                      onChange={(e) => setImageFile(e.target.files ? e.target.files[0] : null)}
                       className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition-colors file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                     />
                     <p className="text-xs text-slate-500 mt-2">Help us see what you are donating so we can prepare accordingly.</p>
@@ -175,6 +268,8 @@ export default function DonationsPage() {
                     </label>
                     <textarea
                       id="description"
+                      value={formData.description}
+                      onChange={handleChange}
                       required
                       rows={4}
                       className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition-colors resize-none"
@@ -186,7 +281,7 @@ export default function DonationsPage() {
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className="px-8 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed w-full md:w-auto"
+                      className="px-8 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed w-full md:w-auto shadow-sm"
                     >
                       {isSubmitting ? "Submitting..." : "Offer Donation"}
                     </button>
