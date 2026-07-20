@@ -86,6 +86,7 @@ export default function EventsPage() {
                     fill 
                     className="object-cover transition-transform duration-700 group-hover:scale-105"
                     sizes="(max-width: 1024px) 100vw, 33vw"
+                    unoptimized
                   />
                   <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/10 transition-colors duration-300 flex items-center justify-center">
                     <span className="opacity-0 group-hover:opacity-100 bg-white/95 text-slate-900 px-4 py-2 rounded-full text-sm font-bold shadow-md transition-opacity duration-300 flex items-center gap-2 transform translate-y-2 group-hover:translate-y-0">
@@ -185,6 +186,7 @@ export default function EventsPage() {
               className="object-contain"
               sizes="100vw"
               priority
+              unoptimized
             />
           </div>
         </div>
