@@ -14,42 +14,34 @@ interface FoundationEvent {
   time: string;
   description: string;
   image_url: string;
+  event_timestamp?: string; // Added to support the new live countdown
 }
 
 // ----------------------------------------------------------------------
-// NEW: Individual Event Card Component to handle independent countdowns
+// Individual Event Card Component to handle independent countdowns
 // ----------------------------------------------------------------------
 function EventCard({ event, onExpand }: { event: FoundationEvent; onExpand: (url: string) => void }) {
   const [status, setStatus] = useState<"future" | "today" | "past">("future");
   const [countdownText, setCountdownText] = useState("");
-  const [dayOfWeek, setDayOfWeek] = useState("");
+
+  // Safely parse the date. Fallback to legacy string if timestamp is missing from older entries.
+  const eventDateObj = event.event_timestamp 
+    ? new Date(event.event_timestamp) 
+    : new Date(`${event.month} ${event.date.replace(/\D/g,'')} ${new Date().getFullYear()}`);
+
+  // Extract beautifully formatted strings directly from the date object
+  const displayDayOfWeek = !isNaN(eventDateObj.getTime()) ? eventDateObj.toLocaleDateString('en-US', { weekday: 'long' }) : "";
+  const displayMonth = !isNaN(eventDateObj.getTime()) ? eventDateObj.toLocaleDateString('en-US', { month: 'short' }).toUpperCase() : event.month;
+  const displayDateNum = !isNaN(eventDateObj.getTime()) ? eventDateObj.getDate().toString() : event.date;
 
   useEffect(() => {
-    // 1. Smart Date Parser (Strips 'st', 'nd', 'rd', 'th' just in case)
-    const cleanDate = event.date.replace(/(st|nd|rd|th)/gi, '').trim();
-    const currentYear = new Date().getFullYear();
-    
-    // Attempt to build a real date object
-    let parsedDate = new Date(`${event.month} ${cleanDate} ${currentYear}`);
-
-    // If the date is more than 30 days in the past, assume it is for NEXT year
-    if (parsedDate < new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)) {
-      parsedDate.setFullYear(currentYear + 1);
-    }
-
-    // 2. Set the Day of the Week (e.g., "Saturday")
-    if (!isNaN(parsedDate.getTime())) {
-      setDayOfWeek(parsedDate.toLocaleDateString('en-US', { weekday: 'long' }));
-    }
-
-    // 3. Countdown Logic
     const calculateTime = () => {
-      if (isNaN(parsedDate.getTime())) return;
+      if (isNaN(eventDateObj.getTime())) return;
 
       const now = new Date();
-      // Zero out the time so we are strictly comparing calendar days
+      // Zero out the exact time so we are strictly comparing calendar days
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-      const eventDay = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate()).getTime();
+      const eventDay = new Date(eventDateObj.getFullYear(), eventDateObj.getMonth(), eventDateObj.getDate()).getTime();
 
       const diffTime = eventDay - today;
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -67,10 +59,10 @@ function EventCard({ event, onExpand }: { event: FoundationEvent; onExpand: (url
     };
 
     calculateTime();
-    // Re-check every hour in case the user leaves the tab open overnight
+    // Re-check every hour in case the user leaves the tab open
     const timer = setInterval(calculateTime, 1000 * 60 * 60); 
     return () => clearInterval(timer);
-  }, [event]);
+  }, [event.event_timestamp, event.date, event.month]);
 
   // Determine dynamic styling based on the event status
   const cardStyles = status === "today" 
@@ -120,20 +112,20 @@ function EventCard({ event, onExpand }: { event: FoundationEvent; onExpand: (url
         {/* Calendar Date Badge */}
         <div className={`flex-shrink-0 flex flex-col items-center justify-center border rounded-2xl w-28 h-32 shadow-sm transition-colors duration-300 ${status === 'today' ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-100 group-hover:bg-blue-600 group-hover:text-white'}`}>
           <span className={`text-xs font-bold uppercase tracking-widest mb-1 ${status === 'today' ? 'text-green-600' : 'group-hover:text-blue-100 text-blue-600'}`}>
-            {event.month}
+            {displayMonth}
           </span>
           <span className={`text-5xl font-extrabold leading-none mb-1 ${status === 'today' ? 'text-green-700' : 'text-slate-900 group-hover:text-white'}`}>
-            {event.date}
+            {displayDateNum}
           </span>
           {/* Automatically calculated Day of the Week */}
           <span className={`text-xs font-semibold uppercase ${status === 'today' ? 'text-green-600' : 'text-slate-500 group-hover:text-blue-200'}`}>
-            {dayOfWeek}
+            {displayDayOfWeek}
           </span>
         </div>
 
         {/* Event Details & Actions */}
         <div className="flex flex-col flex-grow">
-          <div className="flex justify-between items-start gap-4 mb-3">
+          <div className="flex justify-between items-start gap-4 mb-3 flex-wrap">
             <h2 className={`text-2xl font-bold transition-colors ${status === 'past' ? 'text-slate-600' : 'text-slate-900 group-hover:text-blue-600'}`}>
               {event.title}
             </h2>
