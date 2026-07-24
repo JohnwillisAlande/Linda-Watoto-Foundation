@@ -14,7 +14,7 @@ interface FoundationEvent {
   time: string;
   description: string;
   image_url?: string;
-  event_timestamp?: string; // New field for the live countdown
+  event_timestamp?: string; 
 }
 
 interface Donation {
@@ -39,7 +39,9 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // New Form State
+  // Form State
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
@@ -91,7 +93,6 @@ export default function AdminDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
-  // Fetch donations only when the tab is switched
   useEffect(() => {
     if (activeTab === "donations") {
       fetchDonations();
@@ -108,28 +109,83 @@ export default function AdminDashboard() {
     return `${formattedHours}:${minutes} ${ampm}`;
   };
 
-  const handleAddEvent = async (e: React.FormEvent) => {
+  // Helper to trigger edit mode
+  const handleEditClick = (event: FoundationEvent) => {
+    setEditingId(event.id);
+    setTitle(event.title);
+    setLocation(event.location);
+    setDescription(event.description);
+    setExistingImageUrl(event.image_url || null);
+    
+    // Parse Date for the input
+    if (event.event_timestamp) {
+      const d = new Date(event.event_timestamp);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      setRawDate(`${yyyy}-${mm}-${dd}`);
+    }
+    
+    // Parse Time back to 24-hour format for the HTML inputs
+    if (event.time) {
+      try {
+        const [start, end] = event.time.split(' - ');
+        const convertTo24 = (t: string) => {
+          const [timePart, modifier] = t.split(' ');
+          let [h, m] = timePart.split(':');
+          if (h === '12') h = '00';
+          if (modifier === 'PM') h = String(parseInt(h, 10) + 12);
+          return `${h.padStart(2, '0')}:${m}`;
+        };
+        if (start) setStartTime(convertTo24(start));
+        if (end) setEndTime(convertTo24(end));
+      } catch (e) {
+        console.error("Could not parse legacy time string", e);
+      }
+    }
+    
+    // Scroll smoothly to the form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setTitle(""); setLocation(""); setRawDate(""); setStartTime(""); setEndTime(""); setDescription(""); 
+    setImageFile(null); setExistingImageUrl(null);
+    const fileInput = document.getElementById('poster-upload') as HTMLInputElement;
+    if (fileInput) fileInput.value = "";
+  };
+
+  const handleDeleteEvent = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this event? This cannot be undone.")) return;
+    try {
+      const { error } = await supabase.from("events").delete().eq("id", id);
+      if (error) throw error;
+      fetchEvents();
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "An error occurred.";
+      alert("Error deleting event: " + errorMessage);
+    }
+  };
+
+  const handleSaveEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
-      // 1. Process the Date
       const [yyyy, mm, dd] = rawDate.split('-');
       const eventDateNum = parseInt(dd, 10).toString();
       const dateObj = new Date(parseInt(yyyy), parseInt(mm) - 1, parseInt(dd));
       const eventMonthStr = dateObj.toLocaleString('en-US', { month: 'short' }).toUpperCase();
-
-      // 2. Process the Time
+      
       const finalTimeString = `${formatTime(startTime)} - ${formatTime(endTime)}`;
-
-      // 3. Generate the absolute timestamp for the live countdown
-      // Combines the rawDate ("YYYY-MM-DD") and startTime ("HH:MM") into a valid ISO timestamp
+      
       const eventTimestampStr = `${rawDate}T${startTime}:00`;
       const eventTimestampDate = new Date(eventTimestampStr);
 
-      // 4. Upload the Image (if provided)
-      let finalImageUrl = "/assets/images/events/placeholder-1.jpg";
+      let finalImageUrl = existingImageUrl || "/assets/images/events/placeholder-1.jpg";
 
+      // Upload new image if provided
       if (imageFile) {
         const fileExt = imageFile.name.split('.').pop();
         const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
@@ -147,34 +203,35 @@ export default function AdminDashboard() {
         finalImageUrl = publicUrl;
       }
 
-      // 5. Save to Database
-      const { error: dbError } = await supabase.from("events").insert([
-        {
-          title,
-          location,
-          date: eventDateNum,
-          month: eventMonthStr,
-          time: finalTimeString,
-          description,
-          image_url: finalImageUrl,
-          event_timestamp: eventTimestampDate.toISOString(), // NEW: Saved for the countdown!
-        },
-      ]);
+      const payload = {
+        title,
+        location,
+        date: eventDateNum,
+        month: eventMonthStr,
+        time: finalTimeString,
+        description,
+        image_url: finalImageUrl,
+        event_timestamp: eventTimestampDate.toISOString(),
+      };
 
-      if (dbError) throw dbError;
+      if (editingId) {
+        // Update existing event
+        const { error: dbError } = await supabase.from("events").update(payload).eq("id", editingId);
+        if (dbError) throw dbError;
+        alert("Event successfully updated!");
+      } else {
+        // Create new event
+        const { error: dbError } = await supabase.from("events").insert([payload]);
+        if (dbError) throw dbError;
+        alert("Event successfully published!");
+      }
 
-      alert("Event successfully published!");
-      
-      // Reset the form
-      setTitle(""); setLocation(""); setRawDate(""); setStartTime(""); setEndTime(""); setDescription(""); setImageFile(null);
-      const fileInput = document.getElementById('poster-upload') as HTMLInputElement;
-      if (fileInput) fileInput.value = "";
-      
+      handleCancelEdit();
       fetchEvents();
 
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-      alert("Error adding event: " + errorMessage);
+      alert("Error saving event: " + errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -192,7 +249,6 @@ export default function AdminDashboard() {
       <header className="bg-slate-900 text-white px-6 py-4 flex flex-col sm:flex-row justify-between items-center sticky top-0 z-50 gap-4 sm:gap-0">
         <h1 className="font-bold text-xl tracking-wide">LWF <span className="text-blue-400">Admin</span></h1>
         
-        {/* Tab Navigation Menu */}
         <div className="flex bg-slate-800 p-1 rounded-xl">
           <button
             onClick={() => setActiveTab("events")}
@@ -221,9 +277,18 @@ export default function AdminDashboard() {
           
           {/* Left Column: Form */}
           <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 h-fit">
-            <h2 className="text-2xl font-bold text-slate-900 mb-8 border-b border-slate-100 pb-4">Create New Event</h2>
+            <div className="flex justify-between items-center mb-8 border-b border-slate-100 pb-4">
+              <h2 className="text-2xl font-bold text-slate-900">
+                {editingId ? "Edit Event" : "Create New Event"}
+              </h2>
+              {editingId && (
+                <button onClick={handleCancelEdit} className="text-sm font-bold text-slate-500 hover:text-slate-700">
+                  Cancel Edit
+                </button>
+              )}
+            </div>
             
-            <form onSubmit={handleAddEvent} className="space-y-6">
+            <form onSubmit={handleSaveEvent} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Event Title</label>
@@ -235,13 +300,11 @@ export default function AdminDashboard() {
                   <input type="text" required value={location} onChange={e => setLocation(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" placeholder="e.g. Kikuyu" />
                 </div>
 
-                {/* Date Selector */}
                 <div className="md:col-span-2">
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Date</label>
                   <input type="date" required value={rawDate} onChange={e => setRawDate(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow text-slate-700" />
                 </div>
 
-                {/* Time Selectors */}
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Start Time</label>
                   <input type="time" required value={startTime} onChange={e => setStartTime(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow text-slate-700" />
@@ -252,17 +315,18 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Native File Upload */}
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Poster Image (Optional)</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
+                  Poster Image {editingId && existingImageUrl ? "(Optional: Leave blank to keep existing)" : "(Optional)"}
+                </label>
                 <input 
                   id="poster-upload"
                   type="file" 
                   accept="image/*"
                   onChange={e => setImageFile(e.target.files ? e.target.files[0] : null)} 
+                  required={!editingId} // Only required if we are creating a brand new event
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
                 />
-                <p className="text-xs text-slate-400 mt-2">Upload a poster from your device. Must be an image file (JPG, PNG).</p>
               </div>
 
               <div>
@@ -270,8 +334,8 @@ export default function AdminDashboard() {
                 <textarea required value={description} onChange={e => setDescription(e.target.value)} rows={5} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none transition-shadow" placeholder="What will happen at this event?"></textarea>
               </div>
 
-              <button type="submit" disabled={isSubmitting} className="w-full bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 text-lg shadow-sm">
-                {isSubmitting ? "Uploading & Publishing..." : "Publish Event"}
+              <button type="submit" disabled={isSubmitting} className={`w-full text-white font-bold py-4 rounded-xl transition-colors disabled:opacity-50 text-lg shadow-sm ${editingId ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                {isSubmitting ? "Saving..." : editingId ? "Update Event" : "Publish Event"}
               </button>
             </form>
           </div>
@@ -287,7 +351,7 @@ export default function AdminDashboard() {
             ) : (
               <div className="grid gap-4">
                 {events.map((event) => (
-                  <div key={event.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-start gap-4">
+                  <div key={event.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-start gap-4 transition-all hover:shadow-md">
                     
                     {/* Thumbnail Preview */}
                     {event.image_url && (
@@ -297,9 +361,32 @@ export default function AdminDashboard() {
                     )}
 
                     <div className="flex-grow">
-                      <h3 className="font-bold text-slate-900 text-lg">{event.title}</h3>
-                      <p className="text-sm text-slate-500 mb-2">{event.location} • {event.date} {event.month}</p>
-                      <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full">Live on Site</span>
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <h3 className="font-bold text-slate-900 text-lg leading-tight">{event.title}</h3>
+                          <p className="text-sm text-slate-500">{event.location} • {event.date} {event.month}</p>
+                        </div>
+                        
+                        {/* Edit & Delete Action Buttons */}
+                        <div className="flex gap-3">
+                          <button 
+                            onClick={() => handleEditClick(event)} 
+                            className="text-blue-600 hover:text-blue-800 text-sm font-semibold transition-colors"
+                          >
+                            Edit
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteEvent(event.id)} 
+                            className="text-red-500 hover:text-red-700 text-sm font-semibold transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full inline-block">
+                        Live on Site
+                      </span>
                     </div>
                   </div>
                 ))}
